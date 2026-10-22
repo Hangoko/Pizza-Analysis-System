@@ -14,10 +14,9 @@ def generate_orders(num_orders=1000):
         (56.326492, 43.871275),
         (56.312834, 43.937238),
         (56.293337, 44.013856),
-
     ]
     
-    branches = [1, 2, 3, 4, 5] 
+    branches = [1, 2, 3, 4, 5, 6, 7] 
     drivers = list(range(1, 21)) 
     statuses = ["Delivered", "Canceled"]
     data = []
@@ -49,13 +48,13 @@ def generate_orders(num_orders=1000):
         
     df = pd.DataFrame(data)
     
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
     data_dir = os.path.join(base_dir, "data")
     os.makedirs(data_dir, exist_ok=True)
     
     file_path = os.path.join(data_dir, "synthetic_orders.csv")
     df.to_csv(file_path, index=False)
-    print(f"Сгенерировано {num_orders} заказов для Нижнего Новгорода. Файл сохранен: {file_path}")
+    print(f"Сгенерировано {num_orders} заказов. Файл сохранен: {file_path}")
 
 if __name__ == "__main__":
     generate_orders()

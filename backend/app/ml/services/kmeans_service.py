@@ -4,13 +4,12 @@ from sklearn.cluster import KMeans
 import numpy as np
 
 class KMeansAnalyzer:
-    def __init__(self, n_clusters=5):
-        # n_clusters - количество зон (кластеров), на которые мы разобьем город
+    def __init__(self, n_clusters=7):
         self.n_clusters = n_clusters
         self.model = KMeans(n_clusters=self.n_clusters, random_state=42, n_init=10)
 
     def load_data(self):
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
         file_path = os.path.join(base_dir, "data", "synthetic_orders.csv")
         
         if not os.path.exists(file_path):
@@ -45,7 +44,7 @@ class KMeansAnalyzer:
         return recommendations
 
 if __name__ == "__main__":
-    analyzer = KMeansAnalyzer(n_clusters=5)
+    analyzer = KMeansAnalyzer(n_clusters=7)
     results = analyzer.analyze_demand()
     print("Результаты кластеризации (Топ зон спроса):")
     for res in results:

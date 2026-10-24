@@ -1,20 +1,25 @@
 import math
 import os
+from datetime import datetime
 from typing import Any
 
-import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
+from sqlalchemy.orm import Session
 
-# Дефолтные координаты действующих филиалов (совпадают с RoutingService и seed.py)
+from backend.app.db.models.order import OrderStatus
+from backend.app.repositories.branch import BranchRepository
+from backend.app.repositories.order import OrderRepository
+
+# Резервный список филиалов для автономного запуска без подключения к БД
 DEFAULT_BRANCHES: list[dict[str, Any]] = [
-    {"id": 1, "name": "Филиал Нижегородский", "lat": 56.322974, "lon": 44.034741, "is_active": True},
-    {"id": 2, "name": "Филиал Автозавод", "lat": 56.241094, "lon": 43.861618, "is_active": True},
-    {"id": 3, "name": "Филиал Сормово", "lat": 56.364246, "lon": 43.816756, "is_active": True},
-    {"id": 4, "name": "Филиал Приокский", "lat": 56.245525, "lon": 43.985747, "is_active": True},
-    {"id": 5, "name": "Филиал Московский", "lat": 56.326492, "lon": 43.871275, "is_active": True},
-    {"id": 6, "name": "Филиал Канавинский", "lat": 56.312834, "lon": 43.937238, "is_active": True},
-    {"id": 7, "name": "Филиал Советский", "lat": 56.293337, "lon": 44.013856, "is_active": True},
+    {"id": 1, "name": "Филиал Нижегородский", "lat": 56.322974, "lon": 44.034741, "current_queue": 5, "is_active": True},
+    {"id": 2, "name": "Филиал Автозавод", "lat": 56.241094, "lon": 43.861618, "current_queue": 1, "is_active": True},
+    {"id": 3, "name": "Филиал Сормово", "lat": 56.364246, "lon": 43.816756, "current_queue": 4, "is_active": True},
+    {"id": 4, "name": "Филиал Приокский", "lat": 56.245525, "lon": 43.985747, "current_queue": 2, "is_active": True},
+    {"id": 5, "name": "Филиал Московский", "lat": 56.326492, "lon": 43.871275, "current_queue": 3, "is_active": True},
+    {"id": 6, "name": "Филиал Канавинский", "lat": 56.312834, "lon": 43.937238, "current_queue": 6, "is_active": True},
+    {"id": 7, "name": "Филиал Советский", "lat": 56.293337, "lon": 44.013856, "current_queue": 0, "is_active": True},
 ]
 
 
@@ -38,23 +43,61 @@ class KMeansAnalyzer:
     def __init__(
         self,
         n_clusters: int = 7,
+        session: Session | None = None,
         branches: list[dict[str, Any]] | None = None,
         coverage_radius_km: float = 2.0,
         high_demand_threshold: int = 130,
         low_demand_threshold: int = 80,
     ):
         self.n_clusters = n_clusters
+        self.session = session
         self.coverage_radius_km = coverage_radius_km
         self.high_demand_threshold = high_demand_threshold
         self.low_demand_threshold = low_demand_threshold
-        self.branches = (
-            [b for b in branches if b.get("is_active", True)]
-            if branches is not None
-            else [dict(b) for b in DEFAULT_BRANCHES]
-        )
+        self._explicit_branches = branches
+        self.branches = self.load_branches(session=session)
         self.model = KMeans(n_clusters=self.n_clusters, random_state=42, n_init=10)
 
-    def load_data(self) -> pd.DataFrame:
+    def load_branches(self, session: Session | None = None) -> list[dict[str, Any]]:
+        """Загружает список активных филиалов из БД (или возвращает резервный список)."""
+        if self._explicit_branches is not None:
+            return [b for b in self._explicit_branches if b.get("is_active", True)]
+
+        active_session = session or self.session
+        if active_session is not None:
+            db_branches = BranchRepository(active_session).list_active()
+            return [
+                {
+                    "id": b.id,
+                    "name": b.name,
+                    "lat": float(b.lat),
+                    "lon": float(b.lon),
+                    "current_queue": int(b.current_queue),
+                    "is_active": bool(b.is_active),
+                }
+                for b in db_branches
+            ]
+
+        return [dict(b) for b in DEFAULT_BRANCHES if b.get("is_active", True)]
+
+    def load_data(
+        self,
+        session: Session | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+    ) -> pd.DataFrame:
+        """
+        Загружает доставленные заказы из БД через OrderRepository.fetch_df().
+        Если сессия БД не передана — читает локальный файл data/synthetic_orders.csv.
+        """
+        active_session = session or self.session
+        if active_session is not None:
+            return OrderRepository(active_session).fetch_df(
+                date_from=date_from,
+                date_to=date_to,
+                status=OrderStatus.DELIVERED,
+            )
+
         base_dir = os.path.dirname(
             os.path.dirname(
                 os.path.dirname(
@@ -68,7 +111,7 @@ class KMeansAnalyzer:
             raise FileNotFoundError(f"Файл данных не найден: {file_path}")
 
         df = pd.read_csv(file_path)
-        df = df[df["status"] == "Delivered"].copy()
+        df = df[df["status"] == OrderStatus.DELIVERED.value].copy()
         return df
 
     def _find_nearest_branch(
@@ -87,20 +130,27 @@ class KMeansAnalyzer:
                 nearest_branch = branch
         return nearest_branch, min_dist
 
-    def analyze_demand(self, df: pd.DataFrame | None = None) -> list[dict[str, Any]]:
+    def analyze_demand(
+        self,
+        df: pd.DataFrame | None = None,
+        session: Session | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+    ) -> list[dict[str, Any]]:
         """
-        Выполняет кластеризацию K-Means и сопоставляет центроиды с координатами филиалов.
+        Выполняет кластеризацию K-Means по доставленным заказам и сопоставляет
+        центроиды кластеров с координатами действующих филиалов.
+        """
+        active_session = session or self.session
+        if active_session is not None or self._explicit_branches is not None:
+            self.branches = self.load_branches(session=active_session)
 
-        Правила рекомендаций:
-        - В зоне нет филиала (дистанция > coverage_radius_km) и высокий спрос -> "Открыть филиал"
-        - В зоне есть филиал (дистанция <= coverage_radius_km), но низкий спрос -> "Закрыть филиал"
-        - В зоне есть филиал и достаточный спрос -> "Филиал рентабелен"
-        - В зоне нет филиала и низкий/умеренный спрос -> "Спрос низкий"
-        """
         if df is None:
-            df = self.load_data()
+            df = self.load_data(
+                session=active_session, date_from=date_from, date_to=date_to
+            )
         else:
-            df = df[df["status"] == "Delivered"].copy()
+            df = df[df["status"] == OrderStatus.DELIVERED.value].copy()
 
         if df.empty:
             return []
@@ -112,7 +162,7 @@ class KMeansAnalyzer:
             else KMeans(n_clusters=actual_clusters, random_state=42, n_init=10)
         )
 
-        coords = df[["client_lat", "client_lon"]].values
+        coords = df[["client_lat", "client_lon"]].astype(float).values
         model.fit(coords)
 
         centroids = model.cluster_centers_
@@ -159,6 +209,6 @@ class KMeansAnalyzer:
 if __name__ == "__main__":
     analyzer = KMeansAnalyzer(n_clusters=7)
     results = analyzer.analyze_demand()
-    print("Результаты кластеризации (с учетом действующих филиалов):")
+    print("Результаты кластеризации (Топ зон спроса):")
     for res in results:
         print(res)

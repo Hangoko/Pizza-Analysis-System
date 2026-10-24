@@ -12,3 +12,6 @@ __pycache__/
 .env
 .pytest_cache/
 .ruff_cache/
+
+# Локальные настройки Claude Code
+.claude/

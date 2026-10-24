@@ -20,3 +20,7 @@ known-first-party = ["backend"]
 testpaths = ["backend/tests"]
 pythonpath = ["."]
 addopts = "-ra"
+# Starlette предупреждает о переходе TestClient на httpx2; пока используем httpx 0.28
+filterwarnings = [
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]

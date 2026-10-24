@@ -29,6 +29,28 @@ uvicorn backend.app.main:app --reload
 Настройки читаются из переменных окружения или файла `.env` в корне
 (см. `backend/app/core/config.py`).
 
+### База данных: миграции и демо-данные
+
+Нужен PostgreSQL; строка подключения — `DATABASE_URL`
+(по умолчанию `postgresql+psycopg://pizza:pizza@localhost:5432/pizza`).
+Для локальной разработки БД можно поднять в Docker:
+
+```powershell
+docker run -d --name pizza-pg -e POSTGRES_USER=pizza -e POSTGRES_PASSWORD=pizza `
+  -e POSTGRES_DB=pizza -p 5432:5432 postgres:16-alpine
+
+# Применить миграции (из корня репозитория)
+alembic -c backend/alembic.ini upgrade head
+
+# Наполнить БД: 7 филиалов, 20 водителей, заказы из data/synthetic_orders.csv
+# (если CSV нет — он будет сгенерирован). Повторный запуск дублей не создаёт.
+python -m backend.app.scripts.seed
+```
+
+Новая миграция после изменения моделей:
+`alembic -c backend/alembic.ini revision --autogenerate -m "описание"`.
+ER-диаграмма схемы — [docs/er-diagram.md](docs/er-diagram.md).
+
 Проверки перед коммитом:
 
 ```powershell

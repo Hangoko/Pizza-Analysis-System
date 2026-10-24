@@ -1,8 +1,15 @@
 """Тесты эндпоинтов состояния и документации API."""
 
+from collections.abc import Iterator
+from pathlib import Path
+
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from backend.app.core.config import Settings
+from backend.app.db.session import get_db
+from backend.app.main import create_app
 
 
 def test_health_liveness(client: TestClient) -> None:
@@ -13,12 +20,34 @@ def test_health_liveness(client: TestClient) -> None:
     assert body["app"] == "NewFastPizza Analytics API"
 
 
-def test_health_ready_structure(client: TestClient) -> None:
+def test_health_ready_with_database(client: TestClient) -> None:
     response = client.get("/api/v1/health/ready")
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] in ("ready", "not_ready")
+    assert body["status"] == "ready"
     assert set(body["components"]) == {"database", "graph"}
+    assert body["components"]["database"]["status"] == "ok"
+    assert body["components"]["graph"]["status"] == "not_configured"
+
+
+def test_health_ready_database_unavailable(tmp_path: Path) -> None:
+    """Недоступная БД: компонент database в ошибке, ответ 503."""
+    broken_engine = create_engine(f"sqlite:///{tmp_path / 'missing' / 'db.sqlite'}")
+
+    def _broken_db() -> Iterator[Session]:
+        with Session(broken_engine) as session:
+            yield session
+
+    app = create_app()
+    app.dependency_overrides[get_db] = _broken_db
+    with TestClient(app) as test_client:
+        response = test_client.get("/api/v1/health/ready")
+    broken_engine.dispose()
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "not_ready"
+    assert body["components"]["database"]["status"] == "error"
 
 
 def test_openapi_schema(client: TestClient) -> None:

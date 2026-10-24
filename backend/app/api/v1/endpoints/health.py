@@ -3,14 +3,18 @@
 
 - `/health`       — liveness: процесс жив и отвечает.
 - `/health/ready` — readiness: готовность зависимостей (БД, граф дорог).
-  Проверка БД добавляется на этапе 2, статус графа — на этапе 6.
+  Если сервис не готов, возвращается HTTP 503. Статус графа добавляется на этапе 6.
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
+from backend.app.api.deps import get_db
 from backend.app.core.config import get_settings
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -41,18 +45,32 @@ def health() -> HealthResponse:
     return HealthResponse(app=settings.APP_NAME, version=settings.APP_VERSION)
 
 
-@router.get("/ready", response_model=ReadinessResponse, summary="Readiness-проверка")
-def ready() -> ReadinessResponse:
-    """Состояние зависимостей сервиса."""
-    # Заготовки: реальные проверки подключаются на следующих этапах
+def check_database(db: Session) -> ComponentStatus:
+    """Простейший запрос к БД: соединение установлено и СУБД отвечает."""
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        return ComponentStatus(status="error", detail=type(exc).__name__)
+    return ComponentStatus(status="ok")
+
+
+@router.get(
+    "/ready",
+    response_model=ReadinessResponse,
+    summary="Readiness-проверка",
+    responses={503: {"model": ReadinessResponse, "description": "Сервис не готов"}},
+)
+def ready(response: Response, db: Annotated[Session, Depends(get_db)]) -> ReadinessResponse:
+    """Состояние зависимостей сервиса: БД и граф дорог."""
     components = {
-        "database": ComponentStatus(
-            status="not_configured", detail="Проверка БД будет добавлена на этапе 2"
-        ),
+        "database": check_database(db),
+        # Заготовка: загрузка графа подключается на этапе 6
         "graph": ComponentStatus(
             status="not_configured", detail="Загрузка графа будет добавлена на этапе 6"
         ),
     }
     # Сервис не готов, если хотя бы один компонент в ошибке или ещё загружается
     not_ready = any(c.status in ("error", "loading") for c in components.values())
+    if not_ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return ReadinessResponse(status="not_ready" if not_ready else "ready", components=components)

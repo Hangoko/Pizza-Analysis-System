@@ -15,3 +15,7 @@ __pycache__/
 
 # Локальные настройки Claude Code
 .claude/
+
+# Дампы кода и текстовые файлы с дампами кода
+dump_code.py
+project_code_dump.txt

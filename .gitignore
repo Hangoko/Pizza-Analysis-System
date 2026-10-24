@@ -6,3 +6,9 @@ data/*.html
 cache/
 __pycache__/
 *.pyc
+
+# Окружение разработки
+.venv/
+.env
+.pytest_cache/
+.ruff_cache/

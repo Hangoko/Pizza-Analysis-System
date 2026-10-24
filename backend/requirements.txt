@@ -1,7 +1,25 @@
-pandas
-numpy
-scikit-learn
-networkx
-osmnx
-folium
-pickle
+# Зависимости бэкенда (Python 3.12). Версии зафиксированы.
+
+# --- ML / анализ данных ---
+pandas==3.1.0
+numpy==2.5.4
+scikit-learn==1.9.1
+networkx==3.7
+osmnx==2.1.1
+folium==0.20.0
+
+# --- Веб-API ---
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+pydantic==2.14.1
+pydantic-settings==2.16.1
+python-multipart==0.0.32
+
+# --- БД ---
+sqlalchemy==2.1.6
+alembic==1.20.1
+psycopg[binary]==3.3.6
+
+# --- Безопасность ---
+pyjwt==2.15.1
+bcrypt==5.0.0

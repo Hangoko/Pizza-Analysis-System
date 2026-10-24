@@ -22,27 +22,43 @@ class ClustersMapGenerator:
         self.analyzer = analyzer
 
     def generate_clusters_map(self, output_filename="clusters_map.html"):
-        """Генерирует HTML-карту с плавной тепловой картой (Heatmap) и центроидами K-Means."""
+        """Генерирует HTML-карту с серой подложкой Esri, Heatmap, филиалами и центроидами K-Means."""
         print("Запуск анализа K-Means...")
-        recommendations = self.analyzer.analyze_demand()
+        df = self.analyzer.load_data()
+        recommendations = self.analyzer.analyze_demand(df=df)
 
-        # Базовая карта
+        # 1. Создаем базовую карту без дефолтного цветного слоя
         m = folium.Map(
             location=(56.32, 44.00),
             zoom_start=12,
-            tiles="Esri.WorldGrayCanvas"
+            tiles=None,
         )
 
+        # 2. Подключаем публичную серую подложку Esri World Gray Canvas (без API Key)
+        esri_gray_url = (
+            "https://server.arcgisonline.com/ArcGIS/rest/services/"
+            "Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+        )
+        esri_attribution = "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ"
+
+        folium.TileLayer(
+            tiles=esri_gray_url,
+            attr=esri_attribution,
+            name="Esri World Gray Canvas",
+            max_zoom=16,
+            control=False,
+        ).add_to(m)
+
+        # 3. Наносим плавную тепловую карту (Heatmap) по координатам заказов
         try:
-            df = self.analyzer.load_data()
             heat_data = df[["client_lat", "client_lon"]].dropna().values.tolist()
 
             if heat_data:
                 HeatMap(
                     data=heat_data,
                     name="Тепловая карта спроса",
-                    radius=25,       # Радиус влияния точки для слияния в единое облако
-                    blur=18,         # Степень размытия границ для плавного градиента
+                    radius=25,
+                    blur=18,
                     min_opacity=0.35,
                     max_zoom=13,
                     gradient={
@@ -57,26 +73,47 @@ class ClustersMapGenerator:
         except Exception as e:
             print(f"Не удалось построить тепловую карту заказов: {e}")
 
-        # Маркеры и точки центроидов поверх тепловой карты
+        # 4. Отрисовываем действующие филиалы на карте
+        for branch in self.analyzer.branches:
+            folium.Marker(
+                location=(branch["lat"], branch["lon"]),
+                tooltip=(
+                    f"<b>Действующий филиал:</b> {branch['name']}<br>"
+                    f"Координаты: ({branch['lat']}, {branch['lon']})"
+                ),
+                icon=folium.Icon(color="darkblue", icon="cutlery", prefix="fa"),
+            ).add_to(m)
+
+        # 5. Наносим маркеры и точки центроидов K-Means поверх тепловой карты
+        style_map = {
+            "Открыть филиал": ("red", "#d62728", "plus-sign"),
+            "Закрыть филиал": ("orange", "#ff7f0e", "warning-sign"),
+            "Филиал рентабелен": ("green", "#2ca02c", "ok-sign"),
+            "Спрос низкий": ("blue", "#1f77b4", "info-sign"),
+        }
+
         for rec in recommendations:
             lat = rec["center_lat"]
             lon = rec["center_lon"]
             zone_id = rec["zone_id"]
             count = rec["order_count"]
             rec_text = rec["recommendation"]
+            nearest_name = rec.get("nearest_branch_name") or "Нет"
+            dist_km = rec.get("distance_to_branch_km")
+            dist_str = f"{dist_km} км" if dist_km is not None else "—"
 
-            is_recommended = (rec_text == "Открыть филиал")
-            marker_color = "red" if is_recommended else "blue"
-            hex_color = "#d62728" if is_recommended else "#1f77b4"
-            icon_name = "plus-sign" if is_recommended else "info-sign"
+            marker_color, hex_color, icon_name = style_map.get(
+                rec_text, ("blue", "#1f77b4", "info-sign")
+            )
 
             tooltip_html = (
                 f"<b>Зона ID: {zone_id}</b><br>"
                 f"Количество заказов: <b>{count}</b><br>"
-                f"Статус: <b>{rec_text}</b>"
+                f"Ближайший филиал: {nearest_name} ({dist_str})<br>"
+                f"Рекомендация: <b>{rec_text}</b>"
             )
 
-            # Точка с белой обводкой в точных координатах центроида (чтобы не сливалась с фоном Heatmap)
+            # Точка с белой обводкой в точных координатах центроида
             folium.CircleMarker(
                 location=(lat, lon),
                 radius=8,
@@ -95,6 +132,7 @@ class ClustersMapGenerator:
                 icon=folium.Icon(color=marker_color, icon=icon_name),
             ).add_to(m)
 
+        # 6. Сохраняем результат в папку data
         data_dir = os.path.join(base_dir, "data")
         os.makedirs(data_dir, exist_ok=True)
 

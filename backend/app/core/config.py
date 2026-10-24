@@ -16,6 +16,9 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 # Корень репозитория: backend/app/core/config.py -> 3 уровня вверх
 BASE_DIR = Path(__file__).resolve().parents[3]
 
+# Небезопасный секрет для разработки: при его использовании приложение пишет предупреждение
+DEV_JWT_SECRET_KEY = "dev-only-insecure-jwt-secret-change-me-in-production"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -33,7 +36,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg://pizza:pizza@localhost:5432/pizza"
 
     # --- JWT ---
-    JWT_SECRET_KEY: str = "change-me-in-production"
+    # Значение по умолчанию — ТОЛЬКО для локальной разработки; в production задать в env
+    JWT_SECRET_KEY: str = DEV_JWT_SECRET_KEY
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 

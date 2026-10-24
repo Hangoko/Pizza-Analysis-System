@@ -6,6 +6,8 @@
 
 Создаёт 7 филиалов, 20 водителей и заказы из `data/synthetic_orders.csv`
 (если файла нет — генерирует его через `generate_orders()`).
+Если заданы `FIRST_ADMIN_USERNAME`/`FIRST_ADMIN_PASSWORD` и администраторов в БД нет —
+создаёт первого администратора.
 Скрипт идемпотентен: филиалы и водители ищутся по имени, заказы — по `external_id`,
 повторный запуск не создаёт дублей.
 """
@@ -23,6 +25,7 @@ from backend.app.db.models import Branch, Driver, Order, OrderStatus
 from backend.app.repositories.branch import BranchRepository
 from backend.app.repositories.driver import DriverRepository
 from backend.app.repositories.order import OrderRepository
+from backend.app.services.auth_service import ensure_first_admin
 
 
 # Филиалы, координаты и очереди — как в RoutingService.branches (ML-ядро).
@@ -164,9 +167,13 @@ def seed(session: Session, csv_path: Path) -> dict[str, int]:
 def main() -> None:
     from backend.app.db.session import SessionLocal
 
-    csv_path = ensure_orders_csv(get_settings().DATA_DIR)
+    settings = get_settings()
+    csv_path = ensure_orders_csv(settings.DATA_DIR)
     with SessionLocal() as session:
+        admin = ensure_first_admin(session, settings)
         stats = seed(session, csv_path)
+    if admin is not None:
+        print(f"Создан администратор: {admin.username}")
     print(
         f"Филиалов: {stats['branches']}, водителей: {stats['drivers']}, "
         f"новых заказов: {stats['new_orders']}"

@@ -51,6 +51,39 @@ python -m backend.app.scripts.seed
 `alembic -c backend/alembic.ini revision --autogenerate -m "описание"`.
 ER-диаграмма схемы — [docs/er-diagram.md](docs/er-diagram.md).
 
+### Аутентификация и роли
+
+JWT (HS256), эндпоинты `/api/v1/auth`:
+
+- `POST /register` — саморегистрация (JSON `username`, `password` 8+ символов и не длиннее 72 байт,
+  опционально `email`, `full_name`). Роль всегда `driver`; повышает её администратор.
+  Отключается `ALLOW_PUBLIC_REGISTRATION=false` (тогда 403).
+- `POST /login` — OAuth2 password flow (form-data `username`/`password`), возвращает `access_token`.
+  В Swagger работает кнопка **Authorize**.
+- `GET /me` — текущий пользователь (заголовок `Authorization: Bearer <token>`).
+
+Переменные окружения: `JWT_SECRET_KEY` (**в production обязательно задать**; значение по умолчанию
+только для разработки, при нём в лог пишется предупреждение), `JWT_ALGORITHM`,
+`ACCESS_TOKEN_EXPIRE_MINUTES`.
+Первый администратор создаётся командой `python -m backend.app.scripts.seed`, если заданы
+`FIRST_ADMIN_USERNAME`, `FIRST_ADMIN_PASSWORD` (и опционально `FIRST_ADMIN_EMAIL`) и
+администраторов в БД ещё нет; повторный запуск ничего не меняет.
+
+Пользователь читается из БД на каждый запрос: блокировка (`is_active=false` → 403) и смена роли
+действуют сразу. Без токена или с неверным/просроченным токеном — 401, с неподходящей ролью — 403.
+
+Матрица доступа:
+
+| Функция | admin | manager | executive | driver |
+|---|---|---|---|---|
+| KPI / статистика | ✓ | ✓ | ✓ | — |
+| Шаблоны и экспорт CSV | ✓ | ✓ (свои + системные) | ✓ (чтение/экспорт) | — |
+| Рекомендации по филиалам (K-Means) | ✓ | ✓ | ✓ | — |
+| Рекомендация водителю | ✓ | ✓ | — | ✓ |
+| Управление пользователями, граф | ✓ | — | — | — |
+
+В коде роли проверяются зависимостью `require_roles(...)` из `backend/app/api/deps.py`.
+
 Проверки перед коммитом:
 
 ```powershell

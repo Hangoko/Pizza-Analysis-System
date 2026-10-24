@@ -1,6 +1,6 @@
 """Общие фикстуры тестов: SQLite in-memory вместо PostgreSQL и HTTP-клиент."""
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import pytest
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import backend.app.db.models  # noqa: F401  (регистрация таблиц в metadata)
+from backend.app.core.config import Settings
 from backend.app.db.base import Base
 from backend.app.db.session import get_db
 from backend.app.main import create_app
@@ -45,15 +46,56 @@ def db_session(session_factory: sessionmaker[Session]) -> Iterator[Session]:
         yield session
 
 
+TEST_JWT_SECRET = "test-only-jwt-secret-key-with-enough-length-0123456789"
+
+
+def make_test_settings(**overrides: Any) -> Settings:
+    """Настройки тестов: без чтения `.env`, с тестовым JWT-секретом и без загрузки графа."""
+    values: dict[str, Any] = {
+        "JWT_SECRET_KEY": TEST_JWT_SECRET,
+        "LOAD_GRAPH_ON_STARTUP": False,
+        "ALLOW_PUBLIC_REGISTRATION": True,
+        "FIRST_ADMIN_USERNAME": None,
+        "FIRST_ADMIN_PASSWORD": None,
+        "FIRST_ADMIN_EMAIL": None,
+    }
+    values.update(overrides)
+    return Settings(_env_file=None, **values)
+
+
 @pytest.fixture
-def client(session_factory: sessionmaker[Session]) -> Iterator[TestClient]:
-    """HTTP-клиент для приложения (с запуском lifespan) и подменённой сессией БД."""
-    app = create_app()
+def test_settings() -> Settings:
+    return make_test_settings()
+
+
+ClientFactory = Callable[..., TestClient]
+
+
+@pytest.fixture
+def make_client(session_factory: sessionmaker[Session]) -> Iterator[ClientFactory]:
+    """Фабрика HTTP-клиентов: `make_client(settings=..., setup=lambda app: ...)`."""
+    clients: list[TestClient] = []
 
     def _get_test_db() -> Iterator[Session]:
         with session_factory() as session:
             yield session
 
-    app.dependency_overrides[get_db] = _get_test_db
-    with TestClient(app) as test_client:
-        yield test_client
+    def _make(settings: Settings | None = None, setup: Callable[[Any], None] | None = None):
+        app = create_app(settings or make_test_settings())
+        app.dependency_overrides[get_db] = _get_test_db
+        if setup is not None:
+            setup(app)
+        test_client = TestClient(app)
+        test_client.__enter__()
+        clients.append(test_client)
+        return test_client
+
+    yield _make
+    for test_client in clients:
+        test_client.__exit__(None, None, None)
+
+
+@pytest.fixture
+def client(make_client: ClientFactory) -> TestClient:
+    """HTTP-клиент для приложения (с запуском lifespan) и подменённой сессией БД."""
+    return make_client()

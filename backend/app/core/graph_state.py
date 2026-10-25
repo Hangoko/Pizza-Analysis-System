@@ -148,6 +148,8 @@ class GraphRegistry:
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
+        # Сериализует изменения графа из админки (копия → правка → сохранение → замена)
+        self.mutation_lock = threading.Lock()
         self._snapshot: GraphSnapshot | None = None
         self._status = GraphStatus.NOT_LOADED
         self._error: str | None = None

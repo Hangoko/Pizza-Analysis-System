@@ -112,6 +112,48 @@ JWT (HS256), эндпоинты `/api/v1/auth`:
 индекс ближайших узлов строится один раз, узлы филиалов кэшируются, Дейкстра запускается один
 раз от водителя.
 
+### Администрирование (только admin)
+
+Пользователи — `/api/v1/admin/users`:
+
+- `GET ?role=&is_active=&search=&limit=50&offset=0` — список с `total`; `search` — подстрока
+  логина или ФИО.
+- `POST` — сотрудник с любой ролью (`username`, `password`, `role`, опц. `email`, `full_name`,
+  `is_active`, `driver_id` — привязка к записи водителя, только для роли `driver`).
+- `GET /{id}`, `PATCH /{id}` — роль, ФИО, email, `is_active`, сброс пароля (`password`),
+  `driver_id` (`null` — отвязать; смена роли с `driver` отвязывает автоматически).
+- `DELETE /{id}` — мягкая деактивация (`is_active=false`), вернуть — `PATCH {"is_active": true}`.
+
+Нельзя деактивировать или понизить себя и последнего активного администратора — **409**.
+
+Граф дорог — `/api/v1/admin/graph`:
+
+- `GET /info` — статус, версия, источник, узлы/рёбра, `loaded_at`, файл `GRAPH_PATH`.
+- `POST /weights` (multipart `file`, CSV или JSON) — веса пробок. Строка: `u`, `v`, опц. `key`
+  (без него — все параллельные рёбра u→v) и ровно одно из `travel_time` (секунды) или
+  `multiplier` (к исходному времени без пробок, не накапливается; `1` — снять пробку).
+  Некорректные строки пропускаются, в ответе `rows_applied`/`rows_skipped` и причины (до 50).
+- `POST /upload` (multipart `file`) — новый граф: GraphML (`ox.save_graphml` / `nx.write_graphml`)
+  или JSON node-link (`nx.node_link_data`). У узлов обязательны `x` (долгота) и `y` (широта),
+  у рёбер — `travel_time` > 0, иначе **422** со списком ошибок. **Pickle не принимается**
+  (выполнение кода при распаковке) — **415**.
+- `POST /reload` — перечитать граф из `GRAPH_PATH`.
+
+Изменения применяются к копии графа, сохраняются в `GRAPH_PATH` атомарно (временный файл +
+`os.replace`) и подменяют граф в памяти без остановки; параллельные изменения выполняются по
+очереди. Лимит файла — `GRAPH_UPLOAD_MAX_MB` (100), больше — **413**; пока граф грузится при
+старте — **409**.
+
+```csv
+u,v,key,multiplier,travel_time
+1226461234,1226461301,,3,
+1226461301,1226461288,0,,45.5
+```
+
+```powershell
+curl.exe -H "Authorization: Bearer $token" -F "file=@jam.csv" http://localhost:8000/api/v1/admin/graph/weights
+```
+
 Проверки перед коммитом:
 
 ```powershell

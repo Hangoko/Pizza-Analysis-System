@@ -3,6 +3,8 @@
 from fastapi import APIRouter
 
 from backend.app.api.v1.endpoints import (
+    admin_graph,
+    admin_users,
     auth,
     branches,
     health,
@@ -18,3 +20,5 @@ api_router.include_router(stats.router)
 api_router.include_router(reports.router)
 api_router.include_router(recommendations.router)
 api_router.include_router(branches.router)
+api_router.include_router(admin_users.router)
+api_router.include_router(admin_graph.router)

@@ -54,6 +54,8 @@ def make_test_settings(**overrides: Any) -> Settings:
     values: dict[str, Any] = {
         "JWT_SECRET_KEY": TEST_JWT_SECRET,
         "LOAD_GRAPH_ON_STARTUP": False,
+        # В тестах граф OSM никогда не скачивается
+        "GRAPH_DOWNLOAD_IF_MISSING": False,
         "ALLOW_PUBLIC_REGISTRATION": True,
         "FIRST_ADMIN_USERNAME": None,
         "FIRST_ADMIN_PASSWORD": None,

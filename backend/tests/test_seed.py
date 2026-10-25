@@ -6,8 +6,9 @@ import pandas as pd
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from backend.app.db.models import Branch, Driver, Order
+from backend.app.db.models import Branch, Driver, Order, ReportTemplate
 from backend.app.scripts.seed import BRANCHES, DRIVERS_COUNT, seed
+from backend.app.services.report_service import SYSTEM_TEMPLATES
 
 
 def _write_csv(path: Path) -> Path:
@@ -38,13 +39,20 @@ def test_seed_is_idempotent(db_session: Session, tmp_path: Path) -> None:
     csv_path = _write_csv(tmp_path / "orders.csv")
 
     first = seed(db_session, csv_path)
-    assert first == {"branches": len(BRANCHES), "drivers": DRIVERS_COUNT, "new_orders": 2}
+    assert first == {
+        "branches": len(BRANCHES),
+        "drivers": DRIVERS_COUNT,
+        "new_orders": 2,
+        "new_report_templates": len(SYSTEM_TEMPLATES),
+    }
 
     second = seed(db_session, csv_path)
     assert second["new_orders"] == 0
+    assert second["new_report_templates"] == 0
     assert _count(db_session, Branch) == len(BRANCHES)
     assert _count(db_session, Driver) == DRIVERS_COUNT
     assert _count(db_session, Order) == 2
+    assert _count(db_session, ReportTemplate) == len(SYSTEM_TEMPLATES)
 
 
 def test_seed_maps_csv_fields(db_session: Session, tmp_path: Path) -> None:

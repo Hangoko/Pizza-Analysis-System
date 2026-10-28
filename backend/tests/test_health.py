@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from backend.app.core.config import Settings
 from backend.app.db.session import get_db
 from backend.app.main import create_app
+from backend.tests.conftest import make_test_settings
 
 
 def test_health_liveness(client: TestClient) -> None:
@@ -38,7 +39,7 @@ def test_health_ready_database_unavailable(tmp_path: Path) -> None:
         with Session(broken_engine) as session:
             yield session
 
-    app = create_app()
+    app = create_app(make_test_settings())
     app.dependency_overrides[get_db] = _broken_db
     with TestClient(app) as test_client:
         response = test_client.get("/api/v1/health/ready")

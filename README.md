@@ -84,6 +84,34 @@ JWT (HS256), эндпоинты `/api/v1/auth`:
 
 В коде роли проверяются зависимостью `require_roles(...)` из `backend/app/api/deps.py`.
 
+### Рекомендации и граф дорог
+
+Граф дорог Нижнего Новгорода (`GRAPH_PATH`, по умолчанию `data/nn_graph.pkl`) загружается
+при старте **в фоновом потоке** (`LOAD_GRAPH_ON_STARTUP=true`), API отвечает сразу. Если файла
+нет и `GRAPH_DOWNLOAD_IF_MISSING=true`, граф скачивается из OpenStreetMap (1–3 минуты) и
+сохраняется. Пока граф не готов, эндпоинты маршрутов отвечают **503** с `Retry-After`.
+`/api/v1/health/ready` показывает компонент `graph`: при `LOAD_GRAPH_ON_STARTUP=true` загрузка
+(`loading`) и ошибка (`error`) дают 503; при `false` граф необязателен (`not_configured`).
+
+Эндпоинты `/api/v1/recommendations`:
+
+- `GET /driver?lat=&lon=` (admin, manager, driver) — лучший филиал: минимум
+  `минуты в пути - очередь * 2`; в ответе филиал, время, очередь, маршрут `[[lat, lon], ...]`,
+  `elapsed_ms`. Точка дальше `ROUTE_MAX_SNAP_DISTANCE_KM` (2 км) от дорог графа — 422,
+  нет маршрута — 404.
+- `GET /driver/map?lat=&lon=` — то же в виде HTML-карты (folium).
+- `GET /branches?n_clusters=7&date_from=&date_to=` (admin, manager, executive) — зоны спроса
+  K-Means по доставленным заказам и вердикт по филиалам; если заказов меньше `n_clusters` — 422.
+- `GET /branches/map` — HTML-карта: тепловая карта заказов, филиалы, центроиды.
+
+Филиалы: `GET /api/v1/branches` (все роли), `PATCH /api/v1/branches/{id}/queue`
+(admin, manager, тело `{"current_queue": 3}`) — очередь сразу учитывается в рекомендации.
+
+Расчёт маршрута использует ML-код без изменений (`RoutingService`, `KMeansAnalyzer`, генераторы
+карт); ускорение — подкласс `FastRoutingService` (`backend/app/services/routing_adapter.py`):
+индекс ближайших узлов строится один раз, узлы филиалов кэшируются, Дейкстра запускается один
+раз от водителя.
+
 Проверки перед коммитом:
 
 ```powershell

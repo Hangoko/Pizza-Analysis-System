@@ -51,7 +51,13 @@ class Settings(BaseSettings):
     DATA_DIR: Path = BASE_DIR / "data"
     # Если не задан — берётся <DATA_DIR>/nn_graph.pkl
     GRAPH_PATH: Path | None = None
+    # Загружать граф в фоне при старте; при false эндпоинты маршрутов отвечают 503,
+    # а /health/ready не считает отсутствие графа неготовностью
     LOAD_GRAPH_ON_STARTUP: bool = True
+    # Если файла графа нет — скачать его из OpenStreetMap (несколько минут) и сохранить
+    GRAPH_DOWNLOAD_IF_MISSING: bool = True
+    # Точка водителя дальше этого расстояния от ближайшего узла графа — ошибка 422
+    ROUTE_MAX_SNAP_DISTANCE_KM: float = 2.0
 
     # --- Первый администратор (создаётся, если админов ещё нет) ---
     FIRST_ADMIN_USERNAME: str | None = None

@@ -5,6 +5,7 @@
     uvicorn backend.app.main:app --reload
 """
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -14,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.v1.router import api_router
 from backend.app.core.config import DEV_JWT_SECRET_KEY, Settings, get_settings
+from backend.app.core.graph_state import GraphRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +33,31 @@ OPENAPI_TAGS = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Инициализация и освобождение ресурсов приложения."""
-    # Заготовка: загрузка графа дорог в фоне (этап 6).
-    # Первый администратор создаётся скриптом seed (FIRST_ADMIN_*), а не при старте.
+    """
+    Инициализация и освобождение ресурсов приложения.
+
+    Граф дорог (сотни МБ) грузится в фоновом потоке: API отвечает сразу, а эндпоинты
+    маршрутов до готовности графа возвращают 503. Первый администратор создаётся
+    скриптом seed (FIRST_ADMIN_*), а не при старте.
+    """
+    settings: Settings = app.state.settings
+    registry: GraphRegistry = app.state.graph_registry
+    load_task: asyncio.Task[None] | None = None
+    if settings.LOAD_GRAPH_ON_STARTUP and registry.snapshot() is None:
+        registry.mark_loading()
+        load_task = asyncio.create_task(
+            asyncio.to_thread(
+                registry.load_from_file,
+                settings.GRAPH_PATH,
+                allow_download=settings.GRAPH_DOWNLOAD_IF_MISSING,
+            ),
+            name="load-road-graph",
+        )
+    app.state.graph_load_task = load_task
     yield
+    if load_task is not None and not load_task.done():
+        # Поток не прервать; при остановке asyncio дождётся его завершения
+        logger.info("Остановка во время загрузки графа дорог")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -52,6 +75,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
+    app.state.graph_registry = GraphRegistry()
     if settings.JWT_SECRET_KEY == DEV_JWT_SECRET_KEY:
         logger.warning("JWT_SECRET_KEY не задан — используется небезопасный dev-ключ")
 

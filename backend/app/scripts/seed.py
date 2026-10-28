@@ -4,12 +4,12 @@
 Запуск из корня репозитория (после `alembic upgrade head`):
     python -m backend.app.scripts.seed
 
-Создаёт 7 филиалов, 20 водителей и заказы из `data/synthetic_orders.csv`
-(если файла нет — генерирует его через `generate_orders()`).
+Создаёт 7 филиалов, 20 водителей, заказы из `data/synthetic_orders.csv`
+(если файла нет — генерирует его через `generate_orders()`) и системные шаблоны отчётов.
 Если заданы `FIRST_ADMIN_USERNAME`/`FIRST_ADMIN_PASSWORD` и администраторов в БД нет —
 создаёт первого администратора.
 Скрипт идемпотентен: филиалы и водители ищутся по имени, заказы — по `external_id`,
-повторный запуск не создаёт дублей.
+шаблоны — по имени среди системных; повторный запуск не создаёт дублей.
 """
 
 import math
@@ -26,6 +26,7 @@ from backend.app.repositories.branch import BranchRepository
 from backend.app.repositories.driver import DriverRepository
 from backend.app.repositories.order import OrderRepository
 from backend.app.services.auth_service import ensure_first_admin
+from backend.app.services.report_service import seed_system_templates
 
 
 # Филиалы, координаты и очереди — как в RoutingService.branches (ML-ядро).
@@ -160,8 +161,14 @@ def seed(session: Session, csv_path: Path) -> dict[str, int]:
     branches = seed_branches(session)
     drivers = seed_drivers(session, branches)
     new_orders = seed_orders(session, csv_path, branches, drivers)
+    new_templates = seed_system_templates(session)
     session.commit()
-    return {"branches": len(branches), "drivers": len(drivers), "new_orders": new_orders}
+    return {
+        "branches": len(branches),
+        "drivers": len(drivers),
+        "new_orders": new_orders,
+        "new_report_templates": new_templates,
+    }
 
 
 def main() -> None:
@@ -176,7 +183,8 @@ def main() -> None:
         print(f"Создан администратор: {admin.username}")
     print(
         f"Филиалов: {stats['branches']}, водителей: {stats['drivers']}, "
-        f"новых заказов: {stats['new_orders']}"
+        f"новых заказов: {stats['new_orders']}, "
+        f"новых системных шаблонов отчётов: {stats['new_report_templates']}"
     )
 
 

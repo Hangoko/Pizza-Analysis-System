@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, ForeignKey, String, Text, UniqueConstraint, false
+from sqlalchemy import JSON, ForeignKey, Index, String, Text, UniqueConstraint, false, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.db.base import Base, CreatedAtMixin, IdMixin, UpdatedAtMixin
@@ -13,7 +13,18 @@ if TYPE_CHECKING:
 
 class ReportTemplate(IdMixin, CreatedAtMixin, UpdatedAtMixin, Base):
     __tablename__ = "report_templates"
-    __table_args__ = (UniqueConstraint("owner_id", "name"),)
+    __table_args__ = (
+        UniqueConstraint("owner_id", "name"),
+        # NULL в owner_id не считается равным NULL, поэтому UNIQUE(owner_id, name)
+        # не защищает системные шаблоны от дублей — отдельный частичный индекс
+        Index(
+            "uq_report_templates_system_name",
+            "name",
+            unique=True,
+            postgresql_where=text("is_system"),
+            sqlite_where=text("is_system"),
+        ),
+    )
 
     name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text)

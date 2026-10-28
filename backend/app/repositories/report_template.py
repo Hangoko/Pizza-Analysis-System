@@ -25,3 +25,16 @@ class ReportTemplateRepository(BaseRepository[ReportTemplate]):
             ReportTemplate.is_system.is_(True), ReportTemplate.name == name
         )
         return self.session.scalar(stmt)
+
+    def list_all(self) -> Sequence[ReportTemplate]:
+        """Все шаблоны (для администратора): сначала системные, затем по имени."""
+        stmt = select(ReportTemplate).order_by(
+            ReportTemplate.is_system.desc(), ReportTemplate.name, ReportTemplate.id
+        )
+        return self.session.scalars(stmt).all()
+
+    def get_by_owner_and_name(self, owner_id: int, name: str) -> ReportTemplate | None:
+        stmt = select(ReportTemplate).where(
+            ReportTemplate.owner_id == owner_id, ReportTemplate.name == name
+        )
+        return self.session.scalar(stmt)

@@ -11,7 +11,7 @@ from backend.app.ml.services.routing_service import RoutingService
 
 
 def _build_test_graph() -> nx.MultiDiGraph:
-    """Создает компактный тестовый граф дорог для проверки алгоритма Дейкстры без скачивания OSM."""
+    """Компактный тестовый граф дорог для проверки алгоритма Дейкстры без OSM."""
     G = nx.MultiDiGraph()
     G.graph["crs"] = "epsg:4326"
     # Узел 1 — водитель, Узел 2 — Филиал Центр (близко), Узел 3 — Филиал Север (далеко)
@@ -19,7 +19,7 @@ def _build_test_graph() -> nx.MultiDiGraph:
     G.add_node(2, x=44.0100, y=56.3210)
     G.add_node(3, x=43.8500, y=56.3600)
 
-    # Время проезда в секундах: до узла 2 — 5 минут (300 сек), до узла 3 — 20 минут (1200 сек)
+    # Время проезда: до узла 2 — 5 мин (300 с), до узла 3 — 20 мин (1200 с)
     G.add_edge(1, 2, travel_time=300.0)
     G.add_edge(1, 3, travel_time=1200.0)
     return G
@@ -36,9 +36,15 @@ def test_haversine_distance() -> None:
 def test_kmeans_analyzer_reads_orders_and_branches_from_db(db_session: Session) -> None:
     t0 = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
     # 1. Создаем 2 активных филиала и 1 неактивный
-    b_active_high = Branch(name="Филиал Центр", lat=56.3200, lon=44.0000, current_queue=3, is_active=True)
-    b_active_low = Branch(name="Филиал Окраина", lat=56.2000, lon=43.8000, current_queue=0, is_active=True)
-    b_closed = Branch(name="Закрытый филиал", lat=56.4000, lon=44.1000, current_queue=5, is_active=False)
+    b_active_high = Branch(
+        name="Филиал Центр", lat=56.3200, lon=44.0000, current_queue=3, is_active=True
+    )
+    b_active_low = Branch(
+        name="Филиал Окраина", lat=56.2000, lon=43.8000, current_queue=0, is_active=True
+    )
+    b_closed = Branch(
+        name="Закрытый филиал", lat=56.4000, lon=44.1000, current_queue=5, is_active=False
+    )
     db_session.add_all([b_active_high, b_active_low, b_closed])
     db_session.flush()
 
@@ -74,7 +80,7 @@ def test_kmeans_analyzer_reads_orders_and_branches_from_db(db_session: Session) 
         )
         idx += 1
 
-    # Зона 3 (вдали от активных филиалов — рядом только закрытый): 12 заказов -> "Открыть филиал"
+    # Зона 3 (вдали от активных филиалов, рядом закрытый): 12 заказов -> "Открыть филиал"
     for _ in range(12):
         orders.append(
             Order(
@@ -115,13 +121,13 @@ def test_routing_service_reads_and_refreshes_branches_from_db(db_session: Sessio
     graph = _build_test_graph()
     router = RoutingService(session=db_session, graph=graph)
 
-    # 1. При малых очередях выигрывает ближайший "Филиал Центр" (5 мин - 1*2 = 3 против 20 мин - 2*2 = 16)
+    # 1. При малых очередях выигрывает "Филиал Центр" (5 - 1*2 = 3 против 20 - 2*2 = 16)
     rec1 = router.get_driver_recommendation(56.3200, 44.0000)
     assert rec1 is not None
     assert rec1["branch_name"] == "Филиал Центр"
     assert rec1["queue_size"] == 1
 
-    # 2. Обновляем очередь в БД у дальнего филиала до 15 заказов (20 мин - 15*2 = -10)
+    # 2. Обновляем очередь в БД у дальнего филиала до 15 заказов (20 - 15*2 = -10)
     b_far.current_queue = 15
     db_session.commit()
 

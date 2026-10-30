@@ -13,13 +13,62 @@ from backend.app.repositories.order import OrderRepository
 
 # Резервный список филиалов для автономного запуска без подключения к БД
 DEFAULT_BRANCHES: list[dict[str, Any]] = [
-    {"id": 1, "name": "Филиал Нижегородский", "lat": 56.322974, "lon": 44.034741, "current_queue": 5, "is_active": True},
-    {"id": 2, "name": "Филиал Автозавод", "lat": 56.241094, "lon": 43.861618, "current_queue": 1, "is_active": True},
-    {"id": 3, "name": "Филиал Сормово", "lat": 56.364246, "lon": 43.816756, "current_queue": 4, "is_active": True},
-    {"id": 4, "name": "Филиал Приокский", "lat": 56.245525, "lon": 43.985747, "current_queue": 2, "is_active": True},
-    {"id": 5, "name": "Филиал Московский", "lat": 56.326492, "lon": 43.871275, "current_queue": 3, "is_active": True},
-    {"id": 6, "name": "Филиал Канавинский", "lat": 56.312834, "lon": 43.937238, "current_queue": 6, "is_active": True},
-    {"id": 7, "name": "Филиал Советский", "lat": 56.293337, "lon": 44.013856, "current_queue": 0, "is_active": True},
+    {
+        "id": 1,
+        "name": "Филиал Нижегородский",
+        "lat": 56.322974,
+        "lon": 44.034741,
+        "current_queue": 5,
+        "is_active": True,
+    },
+    {
+        "id": 2,
+        "name": "Филиал Автозавод",
+        "lat": 56.241094,
+        "lon": 43.861618,
+        "current_queue": 1,
+        "is_active": True,
+    },
+    {
+        "id": 3,
+        "name": "Филиал Сормово",
+        "lat": 56.364246,
+        "lon": 43.816756,
+        "current_queue": 4,
+        "is_active": True,
+    },
+    {
+        "id": 4,
+        "name": "Филиал Приокский",
+        "lat": 56.245525,
+        "lon": 43.985747,
+        "current_queue": 2,
+        "is_active": True,
+    },
+    {
+        "id": 5,
+        "name": "Филиал Московский",
+        "lat": 56.326492,
+        "lon": 43.871275,
+        "current_queue": 3,
+        "is_active": True,
+    },
+    {
+        "id": 6,
+        "name": "Филиал Канавинский",
+        "lat": 56.312834,
+        "lon": 43.937238,
+        "current_queue": 6,
+        "is_active": True,
+    },
+    {
+        "id": 7,
+        "name": "Филиал Советский",
+        "lat": 56.293337,
+        "lon": 44.013856,
+        "current_queue": 0,
+        "is_active": True,
+    },
 ]
 
 
@@ -100,9 +149,7 @@ class KMeansAnalyzer:
 
         base_dir = os.path.dirname(
             os.path.dirname(
-                os.path.dirname(
-                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                )
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             )
         )
         file_path = os.path.join(base_dir, "data", "synthetic_orders.csv")
@@ -114,9 +161,7 @@ class KMeansAnalyzer:
         df = df[df["status"] == OrderStatus.DELIVERED.value].copy()
         return df
 
-    def _find_nearest_branch(
-        self, lat: float, lon: float
-    ) -> tuple[dict[str, Any] | None, float]:
+    def _find_nearest_branch(self, lat: float, lon: float) -> tuple[dict[str, Any] | None, float]:
         """Находит ближайший действующий филиал и расстояние до него в км."""
         if not self.branches:
             return None, float("inf")
@@ -146,9 +191,7 @@ class KMeansAnalyzer:
             self.branches = self.load_branches(session=active_session)
 
         if df is None:
-            df = self.load_data(
-                session=active_session, date_from=date_from, date_to=date_to
-            )
+            df = self.load_data(session=active_session, date_from=date_from, date_to=date_to)
         else:
             df = df[df["status"] == OrderStatus.DELIVERED.value].copy()
 
@@ -173,9 +216,7 @@ class KMeansAnalyzer:
         for i, (lat, lon) in enumerate(centroids):
             order_count = int(cluster_counts.get(i, 0))
             nearest_branch, dist_km = self._find_nearest_branch(float(lat), float(lon))
-            has_branch_nearby = (
-                nearest_branch is not None and dist_km <= self.coverage_radius_km
-            )
+            has_branch_nearby = nearest_branch is not None and dist_km <= self.coverage_radius_km
 
             if not has_branch_nearby:
                 if order_count >= self.high_demand_threshold:

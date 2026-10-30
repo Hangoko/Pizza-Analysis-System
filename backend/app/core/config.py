@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     GRAPH_DOWNLOAD_IF_MISSING: bool = True
     # Точка водителя дальше этого расстояния от ближайшего узла графа — ошибка 422
     ROUTE_MAX_SNAP_DISTANCE_KM: float = 2.0
+    # Лимит размера файла в /admin/graph/upload и /admin/graph/weights, МБ (больше — 413)
+    GRAPH_UPLOAD_MAX_MB: float = 100.0
 
     # --- Первый администратор (создаётся, если админов ещё нет) ---
     FIRST_ADMIN_USERNAME: str | None = None

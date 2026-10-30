@@ -61,9 +61,7 @@ def generate_orders(num_orders=1000, seed=42):
 
     base_dir = os.path.dirname(
         os.path.dirname(
-            os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            )
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         )
     )
     data_dir = os.path.join(base_dir, "data")

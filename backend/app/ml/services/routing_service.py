@@ -73,9 +73,7 @@ class RoutingService:
         else:
             base_dir = os.path.dirname(
                 os.path.dirname(
-                    os.path.dirname(
-                        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                    )
+                    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
                 )
             )
             data_dir = os.path.join(base_dir, "data")
@@ -115,9 +113,7 @@ class RoutingService:
         best_score = float("inf")
 
         for branch_id, info in self.branches.items():
-            branch_node = ox.distance.nearest_nodes(
-                self.graph, X=info["lon"], Y=info["lat"]
-            )
+            branch_node = ox.distance.nearest_nodes(self.graph, X=info["lon"], Y=info["lat"])
 
             try:
                 travel_time = nx.shortest_path_length(

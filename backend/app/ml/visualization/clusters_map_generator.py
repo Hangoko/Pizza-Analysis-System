@@ -1,20 +1,14 @@
-import os
-import sys
 
-# Настройка путей для корректного импорта модулей проекта из папки visualization
-base_dir = os.path.dirname(
-    os.path.dirname(
-        os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        )
-    )
-)
-if base_dir not in sys.path:
-    sys.path.append(base_dir)
+import os
 
 import folium
 from folium.plugins import HeatMap
+
 from backend.app.ml.services.kmeans_service import KMeansAnalyzer
+
+base_dir = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..")
+)
 
 
 class ClustersMapGenerator:
@@ -22,7 +16,8 @@ class ClustersMapGenerator:
         self.analyzer = analyzer
 
     def generate_clusters_map(self, output_filename="clusters_map.html"):
-        """Генерирует HTML-карту с серой подложкой Esri, Heatmap, филиалами и центроидами K-Means."""
+        """Генерирует HTML-карту с серой подложкой Esri, Heatmap,
+        филиалами и центроидами K-Means."""
         print("Запуск анализа K-Means...")
         df = self.analyzer.load_data()
         recommendations = self.analyzer.analyze_demand(df=df)

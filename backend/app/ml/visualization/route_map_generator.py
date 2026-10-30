@@ -1,24 +1,18 @@
-import os
-import sys
 
-base_dir = os.path.dirname(
-    os.path.dirname(
-        os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        )
-    )
-)
-if base_dir not in sys.path:
-    sys.path.append(base_dir)
+import os
 
 import folium
-import osmnx as ox
+import networkx as nx
 import pandas as pd
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.order import OrderStatus
 from backend.app.ml.services.routing_service import RoutingService
 from backend.app.repositories.order import OrderRepository
+
+base_dir = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..")
+)
 
 
 class MapGenerator:
@@ -39,6 +33,38 @@ class MapGenerator:
             return pd.read_csv(data_path)
         return None
 
+    @staticmethod
+    def _extract_edge_lines(
+        graph: nx.MultiDiGraph,
+    ) -> list[list[tuple[float, float]]]:
+        """Извлекает координаты рёбер графа для отрисовки через folium.PolyLine."""
+        nodes = graph.nodes
+        seen_pairs: set[tuple[object, object]] = set()
+        edge_lines: list[list[tuple[float, float]]] = []
+
+        for u, v, data in graph.edges(data=True):
+            pair = (u, v) if str(u) <= str(v) else (v, u)
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+
+            geometry = data.get("geometry")
+            if geometry is not None and hasattr(geometry, "coords"):
+                line = [(float(lat), float(lon)) for lon, lat in geometry.coords]
+            else:
+                u_node, v_node = nodes[u], nodes[v]
+                if "y" not in u_node or "x" not in u_node:
+                    continue
+                if "y" not in v_node or "x" not in v_node:
+                    continue
+                line = [
+                    (float(u_node["y"]), float(u_node["x"])),
+                    (float(v_node["y"]), float(v_node["x"])),
+                ]
+            edge_lines.append(line)
+
+        return edge_lines
+
     def generate_route_map(self, recommendation, output_filename="route_map.html"):
         """Генерирует HTML-карту с маршрутом и всеми филиалами."""
         if not recommendation:
@@ -49,7 +75,8 @@ class MapGenerator:
         route_nodes = recommendation["route_nodes"]
 
         route_coords = [
-            (graph.nodes[node]["y"], graph.nodes[node]["x"]) for node in route_nodes
+            (graph.nodes[node]["y"], graph.nodes[node]["x"])
+            for node in route_nodes
         ]
         driver_coords = (
             graph.nodes[driver_node]["y"],
@@ -64,18 +91,22 @@ class MapGenerator:
         )
         folium.TileLayer(
             tiles=esri_gray_url,
-            attr="Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
+            attr="Tiles © Esri — Esri, DeLorme, NAVTEQ",
             name="Esri World Gray Canvas",
             max_zoom=16,
             control=False,
         ).add_to(m)
 
-        # 1. Отрисовка всех дорог (серый фон)
+        # 1. Отрисовка всех дорог (серый фон через единый folium.PolyLine без explore)
         try:
-            edges_gdf = ox.graph_to_gdfs(graph, nodes=False)
-            edges_gdf.explore(
-                m=m, color="#cccccc", weight=0.5, opacity=0.5, legend=False
-            )
+            edge_lines = self._extract_edge_lines(graph)
+            if edge_lines:
+                folium.PolyLine(
+                    locations=edge_lines,
+                    color="#cccccc",
+                    weight=0.7,
+                    opacity=0.5,
+                ).add_to(m)
         except Exception as e:
             print(f"Не удалось отрисовать фоновые дороги: {e}")
 

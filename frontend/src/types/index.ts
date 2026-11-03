@@ -152,14 +152,75 @@ export interface BranchRecommendationResponse {
   recommendation: string
 }
 
+// Reports schemas
+export type ReportMetric =
+  | 'orders'
+  | 'delivered'
+  | 'canceled'
+  | 'cancel_rate'
+  | 'avg_delivery_minutes'
+  | 'median_delivery_minutes'
+  | 'p90_delivery_minutes'
+
+export type ReportGroupBy =
+  | 'branch'
+  | 'driver'
+  | 'status'
+  | 'hour'
+  | 'day'
+  | 'week'
+  | 'hour_of_day'
+  | 'weekday'
+
+export type OrderStatusName = 'Pending' | 'InDelivery' | 'Delivered' | 'Canceled'
+
+export type CsvDelimiter = ';' | ','
+
+export interface ReportFilters {
+  branch_ids?: number[] | null
+  driver_ids?: number[] | null
+  statuses?: OrderStatusName[] | null
+}
+
+export interface ReportConfig {
+  metrics: ReportMetric[]
+  group_by?: ReportGroupBy | null
+  filters?: ReportFilters
+  default_period_days?: number | null
+}
+
 export interface ReportTemplate {
   id: number
   name: string
   system_name?: string | null
   description?: string | null
   is_system: boolean
-  config?: Record<string, unknown>
+  config: ReportConfig
   created_at?: string
+  updated_at?: string
+  user_id?: number | null
+}
+
+export interface ReportTemplateCreate {
+  name: string
+  description?: string | null
+  config: ReportConfig
+  is_system?: boolean
+}
+
+export interface ReportTemplateUpdate {
+  name?: string
+  description?: string | null
+  config?: ReportConfig
+}
+
+export interface ReportPreview {
+  period: {
+    date_from: string | null
+    date_to: string | null
+  }
+  columns: string[]
+  rows: Record<string, any>[]
 }
 
 export interface GraphBBox {

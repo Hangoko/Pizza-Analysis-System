@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 font-sans;
+  }
+}
+
+/* Flat design custom utilities */
+.card-flat {
+  @apply bg-white border border-slate-200 rounded-none shadow-none;
+}
+
+.table-flat th {
+  @apply bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider px-4 py-3 text-left border-b border-slate-200;
+}
+
+.table-flat td {
+  @apply px-4 py-3 text-sm text-slate-700 border-b border-slate-100;
+}

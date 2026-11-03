@@ -125,6 +125,33 @@ export interface DriverRecommendation {
   elapsed_ms: number
 }
 
+export interface ClusterCentroid {
+  lat: number
+  lon: number
+}
+
+export interface NearestBranchInfo {
+  id: number
+  name: string
+  distance_km: number
+}
+
+export interface ClusterItem {
+  cluster_id: number
+  centroid: ClusterCentroid
+  orders_count: number
+  share_pct: number
+  nearest_branch: NearestBranchInfo | null
+  verdict: string
+}
+
+export interface BranchRecommendationResponse {
+  n_clusters: number
+  orders_count: number
+  clusters: ClusterItem[]
+  recommendation: string
+}
+
 export interface ReportTemplate {
   id: number
   name: string

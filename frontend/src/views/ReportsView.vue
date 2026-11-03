@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { apiRequest } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import type {
@@ -84,6 +84,15 @@ const availableStatuses: OrderStatusName[] = ['Delivered', 'InDelivery', 'Pendin
 
 const errorMessage = ref('')
 const successMessage = ref('')
+const dateValidationError = ref('')
+
+watch([dateFrom, dateTo], () => {
+  if (dateFrom.value && dateTo.value && dateFrom.value > dateTo.value) {
+    dateValidationError.value = 'Начало периода не может быть позже окончания'
+  } else {
+    dateValidationError.value = ''
+  }
+})
 
 async function loadTemplates() {
   isLoadingTemplates.value = true
@@ -138,7 +147,7 @@ async function loadTemplates() {
 }
 
 async function exportTemplateCsv() {
-  if (!selectedTemplateId.value) return
+  if (!selectedTemplateId.value || dateValidationError.value) return
   isExporting.value = true
   errorMessage.value = ''
   successMessage.value = ''
@@ -188,6 +197,7 @@ function buildCurrentConfig() {
 }
 
 async function runPreview() {
+  if (dateValidationError.value) return
   isPreviewing.value = true
   errorMessage.value = ''
   try {
@@ -221,6 +231,7 @@ async function runPreview() {
 }
 
 async function exportAdhocCsv() {
+  if (dateValidationError.value) return
   isExporting.value = true
   errorMessage.value = ''
   try {
@@ -366,6 +377,14 @@ onMounted(() => {
     </div>
 
     <!-- Alerts -->
+    <div v-if="dateValidationError" class="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
+      <AlertCircle class="w-4 h-4 text-amber-600 shrink-0" />
+      <div>
+        <span class="font-bold">Ошибка периода: </span>
+        <span>{{ dateValidationError }}</span>
+      </div>
+    </div>
+
     <div v-if="errorMessage" class="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
       <AlertCircle class="w-4 h-4 text-rose-600 shrink-0" />
       <span>{{ errorMessage }}</span>

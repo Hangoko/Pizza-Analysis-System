@@ -43,7 +43,7 @@ function applyPreset(p: { lat: number; lon: number }) {
 
 function requestGpsLocation() {
   if (!navigator.geolocation) {
-    alert('Геолокация не поддерживается вашим браузером')
+    errorMessage.value = 'Геолокация не поддерживается вашим браузером'
     return
   }
 
@@ -54,7 +54,7 @@ function requestGpsLocation() {
       calculateRoute()
     },
     () => {
-      alert('Не удалось получить координаты GPS. Убедитесь, что разрешили доступ.')
+      errorMessage.value = 'Не удалось получить координаты GPS. Убедитесь, что разрешили доступ к геопозиции в браузере.'
     }
   )
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { apiRequest } from '@/api/client'
 import type { BranchRecommendationResponse } from '@/types'
 import {
@@ -20,6 +20,7 @@ const dateFrom = ref('')
 const dateTo = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
+const dateValidationError = ref('')
 const isFullscreen = ref(false)
 
 const analysisResult = ref<BranchRecommendationResponse | null>(null)
@@ -106,6 +107,7 @@ function setFallbackData() {
 }
 
 async function runAnalysis() {
+  if (dateValidationError.value) return
   isLoading.value = true
   errorMessage.value = ''
   try {
@@ -133,6 +135,14 @@ async function runAnalysis() {
   }
 }
 
+watch([dateFrom, dateTo], () => {
+  if (dateFrom.value && dateTo.value && dateFrom.value > dateTo.value) {
+    dateValidationError.value = 'Начало периода не может быть позже окончания'
+  } else {
+    dateValidationError.value = ''
+  }
+})
+
 onMounted(() => {
   runAnalysis()
 })
@@ -153,6 +163,15 @@ onMounted(() => {
         <span class="text-xs font-mono px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700">
           k = {{ nClusters }} кластеров
         </span>
+      </div>
+    </div>
+
+    <!-- Date Validation Warning -->
+    <div v-if="dateValidationError" class="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
+      <AlertCircle class="w-4 h-4 text-amber-600 shrink-0" />
+      <div>
+        <span class="font-bold">Ошибка периода: </span>
+        <span>{{ dateValidationError }}</span>
       </div>
     </div>
 

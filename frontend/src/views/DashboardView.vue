@@ -58,6 +58,8 @@ const selectedBranchId = ref<string>('')
 const granularity = ref<Granularity>('day')
 const isLoading = ref(false)
 const errorMessage = ref('')
+const dateValidationError = ref('')
+const queueNotice = ref<{ message: string; isError: boolean } | null>(null)
 
 // Data states
 const kpi = ref<KpiResponse | null>(null)
@@ -115,6 +117,7 @@ function setFallbackData() {
 }
 
 async function loadDashboardData() {
+  if (dateValidationError.value) return
   isLoading.value = true
   errorMessage.value = ''
   try {
@@ -170,16 +173,32 @@ async function loadDashboardData() {
 }
 
 async function updateBranchQueue(branchId: number, newQueue: number) {
+  if (newQueue < 0) {
+    queueNotice.value = { message: 'Размер очереди не может быть отрицательным', isError: true }
+    setTimeout(() => { queueNotice.value = null }, 4000)
+    return
+  }
   try {
     await apiRequest(`/branches/${branchId}/queue`, {
       method: 'PATCH',
       body: JSON.stringify({ current_queue: newQueue }),
     })
+    queueNotice.value = { message: `Очередь филиала #${branchId} обновлена (${newQueue} заказов)`, isError: false }
+    setTimeout(() => { queueNotice.value = null }, 3500)
     await loadDashboardData()
   } catch (err: any) {
-    alert(err.message || 'Ошибка обновления очереди филиала')
+    queueNotice.value = { message: err.message || 'Ошибка обновления очереди филиала', isError: true }
+    setTimeout(() => { queueNotice.value = null }, 5000)
   }
 }
+
+watch([dateFrom, dateTo], () => {
+  if (dateFrom.value && dateTo.value && dateFrom.value > dateTo.value) {
+    dateValidationError.value = 'Начало периода не может быть позже окончания'
+  } else {
+    dateValidationError.value = ''
+  }
+})
 
 function renderCharts() {
   // 1. Render Timeseries Chart
@@ -388,6 +407,12 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Date Validation Warning -->
+    <div v-if="dateValidationError" class="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
+      <span class="font-bold">Ошибка периода:</span>
+      <span>{{ dateValidationError }}</span>
+    </div>
+
     <!-- Error Alert -->
     <div v-if="errorMessage" class="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs">
       {{ errorMessage }}
@@ -514,6 +539,13 @@ onMounted(() => {
 
     <!-- Branch Detailed Table (with Deviation and Queue modification) -->
     <div class="bg-white border border-slate-200">
+      <div v-if="queueNotice" class="px-5 py-2.5 text-xs border-b flex items-center justify-between"
+        :class="queueNotice.isError ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'"
+      >
+        <span>{{ queueNotice.message }}</span>
+        <button type="button" @click="queueNotice = null" class="text-xs font-bold hover:opacity-75">✕</button>
+      </div>
+
       <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
         <div>
           <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">

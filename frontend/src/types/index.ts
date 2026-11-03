@@ -53,6 +53,60 @@ export interface Branch {
   is_active: boolean
 }
 
+export type Granularity = 'hour' | 'day' | 'week'
+
+export interface StatsPeriod {
+  date_from: string | null
+  date_to: string | null
+  branch_ids: number[] | null
+}
+
+export interface KpiResponse {
+  total_orders: number
+  delivered: number
+  canceled: number
+  cancel_rate: number
+  avg_delivery_minutes: number | null
+  median_delivery_minutes: number | null
+  p90_delivery_minutes: number | null
+  period: StatsPeriod
+}
+
+export interface BranchLoadItem {
+  branch_id: number
+  branch_name: string | null
+  orders: number
+  share_pct: number
+  delivered: number
+  canceled: number
+  cancel_rate: number
+  avg_delivery_minutes: number | null
+  deviation_from_mean: number
+  deviation_pct: number | null
+}
+
+export interface BranchLoadResponse {
+  period: StatsPeriod
+  total_orders: number
+  mean_orders: number
+  items: BranchLoadItem[]
+}
+
+export interface TimeseriesPoint {
+  period_start: string
+  orders: number
+  delivered: number
+  canceled: number
+  cancel_rate: number
+  avg_delivery_minutes: number | null
+}
+
+export interface TimeseriesResponse {
+  period: StatsPeriod
+  granularity: Granularity
+  points: TimeseriesPoint[]
+}
+
 export interface DriverRecommendation {
   driver_location: {
     lat: number

@@ -146,9 +146,19 @@ function handleLogout() {
             <span class="font-mono text-[11px]">API: Online</span>
           </div>
 
-          <!-- Role indicator badge -->
-          <div class="px-2.5 py-1 bg-white border border-slate-300 text-slate-700 font-mono text-[11px] uppercase tracking-wider">
-            {{ authStore.role || 'Guest' }}
+          <!-- Role switcher selector -->
+          <div class="flex items-center gap-1.5 border border-slate-300 bg-white px-2 py-0.5">
+            <span class="text-[10px] uppercase font-mono text-slate-400">Роль:</span>
+            <select
+              :value="authStore.role"
+              @change="(e) => authStore.setDemoUser((e.target as HTMLSelectElement).value as any)"
+              class="font-mono text-[11px] uppercase tracking-wider text-slate-800 bg-transparent focus:outline-none cursor-pointer"
+            >
+              <option value="admin">admin</option>
+              <option value="manager">manager</option>
+              <option value="executive">executive</option>
+              <option value="driver">driver</option>
+            </select>
           </div>
         </div>
       </header>

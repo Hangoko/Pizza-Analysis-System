@@ -26,7 +26,10 @@ const router = createRouter({
       children: [
         {
           path: '',
-          redirect: '/dashboard',
+          redirect: () => {
+            const authStore = useAuthStore()
+            return authStore.role === 'driver' ? '/map/driver' : '/dashboard'
+          },
         },
         {
           path: 'dashboard',
@@ -91,7 +94,7 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.roles && Array.isArray(to.meta.roles)) {
     const userRole = authStore.role
     if (userRole && !to.meta.roles.includes(userRole)) {
-      next({ name: 'dashboard' })
+      next(userRole === 'driver' ? '/map/driver' : '/dashboard')
       return
     }
   }

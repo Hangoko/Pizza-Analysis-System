@@ -32,9 +32,10 @@ nano .env
 ```
 
 Обязательно замените `POSTGRES_PASSWORD`, `JWT_SECRET_KEY` и `FIRST_ADMIN_PASSWORD`.
-По умолчанию API слушает только `127.0.0.1:8000`; внешний HTTPS следует завершать на nginx
-или другом reverse proxy. Для прямого тестового доступа можно явно задать
-`APP_BIND_ADDRESS=0.0.0.0` и ограничить порт firewall.
+По умолчанию backend слушает только `127.0.0.1:8000`, а frontend nginx опубликован на
+`0.0.0.0:8080` и проксирует `/api/` в backend. Внешний HTTPS следует завершать на nginx или
+другом reverse proxy перед frontend. Адреса меняются через `BACKEND_BIND_ADDRESS`,
+`BACKEND_PORT`, `FRONTEND_BIND_ADDRESS` и `FRONTEND_PORT`.
 
 ## GitHub Environment `test`
 
@@ -61,7 +62,8 @@ sh scripts/smoke-test.sh
 docker compose --env-file .env logs --tail=100 api
 ```
 
-Данные PostgreSQL и backend сохраняются в именованных volumes `postgres_data` и `app_data`.
+Данные PostgreSQL и backend-граф сохраняются в именованных volumes `postgres_data` и
+`graph_data`.
 Команда `docker compose down` не удаляет их; не используйте `down --volumes` на VPS без
 явного намерения удалить данные.
 

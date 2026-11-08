@@ -1,7 +1,7 @@
 name: pizza-analysis
 
 services:
-  db:
+  postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -17,30 +17,31 @@ services:
       retries: 12
       start_period: 10s
 
-  api:
-    image: pizza-analysis-api:local
+  backend:
+    image: pizza-analysis-backend:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pizza}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pizza}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pizza}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pizza}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in .env}
       FIRST_ADMIN_USERNAME: ${FIRST_ADMIN_USERNAME:-}
       FIRST_ADMIN_PASSWORD: ${FIRST_ADMIN_PASSWORD:-}
       FIRST_ADMIN_EMAIL: ${FIRST_ADMIN_EMAIL:-}
       ALLOW_PUBLIC_REGISTRATION: ${ALLOW_PUBLIC_REGISTRATION:-false}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
       LOAD_GRAPH_ON_STARTUP: ${LOAD_GRAPH_ON_STARTUP:-false}
       GRAPH_DOWNLOAD_IF_MISSING: ${GRAPH_DOWNLOAD_IF_MISSING:-false}
       DATA_DIR: /app/data
+      GRAPH_PATH: /app/data/nn_graph.pkl
       RUN_SEED: ${RUN_SEED:-true}
     ports:
-      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8000}:8000"
+      - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-8000}:8000"
     volumes:
-      - app_data:/app/data
+      - graph_data:/app/data
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
     healthcheck:
       test:
@@ -53,7 +54,19 @@ services:
       retries: 12
       start_period: 30s
 
+  frontend:
+    image: pizza-analysis-frontend:local
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_BIND_ADDRESS:-0.0.0.0}:${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   postgres_data:
-  app_data:
+  graph_data:
 

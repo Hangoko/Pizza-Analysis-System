@@ -8,6 +8,8 @@
 
 Проект организован по принципу монорепозитория:
 
+CI/CD, Docker Compose и развёртывание на тестовом VPS — [docs/deployment.md](docs/deployment.md).
+
 ```
 Pizza-Analysis-System/
 ├── backend/                  # REST API на FastAPI (Python 3.12)

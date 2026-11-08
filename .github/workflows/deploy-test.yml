@@ -1,0 +1,104 @@
+name: Deploy test VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-vps
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    name: Verify before deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements-dev.txt
+
+      - name: Run quality gates
+        run: |
+          ruff check backend
+          ruff format --check backend
+          pytest -q
+
+  deploy:
+    name: Deploy and smoke test
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: test
+
+    steps:
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Update containers on VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PATH: ${{ secrets.VPS_PATH }}
+          VPS_PORT: ${{ vars.VPS_PORT || '22' }}
+          REPOSITORY_URL: https://github.com/${{ github.repository }}.git
+        run: |
+          ssh -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \
+            bash -s -- "$REPOSITORY_URL" "$VPS_PATH" <<'REMOTE'
+          set -eu
+
+          REPOSITORY_URL="$1"
+          VPS_PATH="$2"
+
+          case "$VPS_PATH" in
+            /*) ;;
+            *) echo "VPS_PATH must be an absolute path" >&2; exit 1 ;;
+          esac
+
+          if [ ! -d "$VPS_PATH/.git" ]; then
+            mkdir -p "$(dirname "$VPS_PATH")"
+            git clone --branch main --single-branch "$REPOSITORY_URL" "$VPS_PATH"
+          fi
+
+          cd "$VPS_PATH"
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+
+          test -f .env || {
+            echo "Missing $VPS_PATH/.env; create it from .env.example" >&2
+            exit 1
+          }
+
+          docker compose --env-file .env up --detach --build --remove-orphans
+          docker compose --env-file .env ps
+          sh scripts/smoke-test.sh
+          REMOTE
+
